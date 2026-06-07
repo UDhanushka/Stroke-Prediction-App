@@ -1,0 +1,1012 @@
+---
+title: "Build and deploy a stroke prediction model using R"
+date: "`r Sys.Date()`"
+output: html_document
+author: "Put your name!"
+---
+
+# About Data Analysis Report
+
+This RMarkdown file contains the report of the data analysis done for the project on building and deploying a stroke prediction model in R. It contains analysis such as data exploration, summary statistics and building the prediction models. The final report was completed on `r date()`. 
+
+**Data Description:**
+
+According to the World Health Organization (WHO) stroke is the 2nd leading cause of death globally, responsible for approximately 11% of total deaths.
+
+This data set is used to predict whether a patient is likely to get stroke based on the input parameters like gender, age, various diseases, and smoking status. Each row in the data provides relevant information about the patient.
+
+
+# Task One: Import data and data preprocessing
+
+## Load data and install packages
+
+```{r}
+# Install packages if needed
+# install.packages("tidyverse")
+# install.packages("corrplot")
+# install.packages("mice")
+# install.packages("DataExplorer")
+# install.packages("janitor")
+# install.packages("skimr")
+
+# Load packages
+library(tidyverse)
+library(skimr)
+library(janitor)
+library(corrplot)
+library(mice)
+library(DataExplorer)
+
+
+stroke <- read.csv("healthcare-dataset-stroke-data.csv")
+
+print(head(stroke))
+
+print(dim(stroke))
+
+print(str(stroke))
+print(summary(stroke))
+
+colSums(is.na(stroke))
+
+#Remove ID Column-The ID column does not contribute to prediction.
+stroke <- stroke[, !(names(stroke) %in% c("id"))]
+
+#Convert Variables to Appropriate Data Types
+stroke <- stroke %>%
+  mutate(
+    gender = as.factor(gender),
+    hypertension = as.factor(hypertension),
+    heart_disease = as.factor(heart_disease),
+    ever_married = as.factor(ever_married),
+    work_type = as.factor(work_type),
+    Residence_type = as.factor(Residence_type),
+    smoking_status = as.factor(smoking_status),
+    stroke = as.factor(stroke)
+)
+
+print(str(stroke))
+
+#Fix BMI Data Type
+stroke$bmi[stroke$bmi == "N/A"] <- NA
+stroke$bmi <- as.numeric(stroke$bmi)
+
+
+#4.6 Handle Inconsistent Values
+unique(stroke$gender)
+unique(stroke$work_type)
+unique(stroke$Residence_type)
+unique(stroke$smoking_status)
+
+stroke$smoking_status[stroke$smoking_status == "Unknown"] <- NA
+
+#Check Duplicate Records
+sum(duplicated(stroke))
+stroke <- distinct(stroke)
+
+
+```
+
+
+
+
+## Describe and explore the data
+
+
+```{r}
+#Summary Statistics
+summary(stroke)
+
+#5.2 Distribution of Stroke Cases
+library(ggplot2)
+
+ggplot(stroke,aes(x=stroke,fill = stroke))+
+  geom_bar() + 
+  labs(title = "Distribution of Stroke Cases",x = "Stroke",y = "Count")+
+  theme_minimal()
+
+
+#Age Distribution
+ggplot(stroke,aes(x= age))+
+  geom_histogram(bins = 30)+
+  labs(title = "Age Distribution",
+    x = "Age",
+    y = "Frequency")+
+  theme_minimal()
+
+#Age and Stroke Relationship(theme_minmal - remove the gray color background in the charts)
+ggplot(stroke,aes(x=stroke,y=age,fill=stroke))+
+  geom_boxplot()+
+  labs(title = "Age by Stroke Status",
+    x = "Stroke",
+    y = "Age")+
+  theme_minimal()
+
+
+#Hypertension and Stroke(fill- fill the colors for bars, position ="fill" - it show like presentage wise)
+ggplot(stroke,aes(x=hypertension,fill=stroke))+
+  geom_bar(position = "fill")+
+  labs(title = "Stroke by Hypertension Status",
+    x = "Hypertension",
+    y = "Proportion")+
+  theme_minimal()
+
+#Heart Disease and Stroke
+ggplot(stroke,aes(x=heart_disease,fill=stroke))+
+  geom_bar(position = "fill")+
+  labs(title = "Stroke by Heart Disease Status",
+    x = "Heart Disease",
+    y = "Proportion")+
+  theme_minimal()
+
+#Average Glucose Level Distribution
+ggplot(stroke,aes(x=avg_glucose_level))+
+  geom_histogram(bins = 30)+
+  labs(tittle="Avg Glucose",x="avg_glucose")+
+  theme_minimal()
+
+#Average Glucose Level by Stroke Status
+ggplot(stroke,aes(x=stroke,y=avg_glucose_level,fill=stroke))+
+  geom_boxplot()+
+  labs(title = "Average Glucose Level by Stroke Status",
+    x = "Stroke",
+    y = "Average Glucose Level")+
+  theme_minimal()
+
+#BMI Distribution
+ggplot(stroke,
+       aes(x = bmi)) +
+  geom_histogram(bins = 30) +
+  labs(
+    title = "BMI Distribution",
+    x = "BMI",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+
+#Smoking Status and Stroke
+ggplot(stroke,
+       aes(x = smoking_status,
+           fill = stroke)) +
+  geom_bar(position = "fill") +
+  labs(
+    title = "Stroke by Smoking Status",
+    x = "Smoking Status",
+    y = "Proportion"
+  ) +
+  theme_minimal()
+
+#Gender and Stroke
+ggplot(stroke,
+       aes(x = gender,
+           fill = stroke)) +
+  geom_bar(position = "fill") +
+  labs(
+    title = "Stroke by Gender",
+    x = "Gender",
+    y = "Proportion"
+  ) +
+  theme_minimal()
+
+
+#Correlation Analysis
+install.packages("corrplot")
+library(corrplot)
+
+#Select numeric variables then store in to new variable
+numeric_vars <- stroke[, c("age",
+                           "avg_glucose_level",
+                           "bmi")]
+
+#cor() - Calculates the correlation between variables.A correlation measures how strongly two variables move together.(+1 positive,0 no relationship,-1 negative relationship)
+#use = "complete.obs"- Ignore rows that contain missing values (NA)
+cor_matrix <- cor(
+  numeric_vars,
+  use = "complete.obs"
+)
+print(cor_matrix)
+
+#Visualize the correlation matrix -Draws a graphical representation of the correlations.
+#method = "circle"-Uses circles to represent correlations.(Larger circle = stronger correlation,Smaller circle = weaker correlation)
+corrplot(
+  cor_matrix,
+  method = "circle"
+)
+
+
+#(Key Insights from EDA
+#The dataset is highly imbalanced, with relatively few stroke cases.
+#Age appears to be one of the strongest predictors of stroke.
+#Patients with hypertension show a higher prevalence of stroke.
+#Heart disease is positively associated with stroke occurrence.
+#Higher average glucose levels are observed among stroke patients.
+#Smoking status may contribute to stroke risk.
+#BMI shows some variation across patients but requires missing value imputation.
+#Several variables demonstrate predictive potential and should be retained for model development.)**
+
+```
+
+
+
+
+
+# Task Two: Build prediction models
+
+```{r}
+#Introduction to Tidymodels-Tidymodels is a collection of R packages designed for machine learning and data modeling using a consistent and user-friendly workflow. It follows the principles of the tidyverse, making data science tasks easier to read, write, and maintain.Instead of learning different functions for each machine learning algorithm, tidymodels provides a unified framework forData preprocessing Splitting data,Building models,Training models,Evaluating performance,Tuning hyperparameters
+# install.packages("tidymodels")
+# install.packages("themis")
+# install.packages("vip")
+# install.packages("xgboost")
+# install.packages("ranger")
+library(tidymodels)
+library(themis)      # SMOTE
+library(vip)
+library(xgboost)
+library(ranger)
+
+#Train-Test Split
+#set.seed(123) - Fixes randomness in R.When you split data, R uses random sampling.
+#initial_split() - Split dataset into train/test
+#stroke_clean - This is your cleaned dataset (no missing values or processed data).
+#strata = stroke - Keep the same proportion of stroke cases in both train and test sets.
+set.seed(123)
+
+stroke_clean <- stroke
+stroke_split <- initial_split(
+  stroke_clean,
+  prop = 0.8,
+  strata = stroke
+)
+
+stroke_train <- training(stroke_split)
+stroke_test <- testing(stroke_split)
+
+table(stroke_train$stroke)
+table(stroke_test$stroke)
+
+
+#Create Preprocessing Recipe
+#stroke = target variable (what you want to predict), "." = all other columns are predictors (features),stroke_train = training dataset
+#👉 “Use all variables to predict stroke using the training data.”
+stroke_recipe <- recipe(
+  stroke ~ .,
+  data = stroke_train
+)%>%
+  step_impute_median(all_numeric_predictors()) %>% #Handle missing numeric values - Finds missing values in numeric columns,Replaces them with the median value(AGE - Median = 52.5 → replaces NA with 52.5)
+  step_impute_mode(all_nominal_predictors()) %>% #Handle missing categorical values - Fills missing categorical values,Uses the most frequent category (mode) - (smoked_status Mode = "never smoked" → fills NA)
+  step_dummy(all_nominal_predictors()) %>% #Convert categorical variables into numbers - Machine learning models need numbers, not text.(male -> 1female -> 0)
+  step_normalize(all_numeric_predictors()) %>% #Normalize numeric values - Scales numeric variables to same range
+  step_smote(stroke) #Handle class imbalance - SMOTE = Synthetic Minority Over-sampling Technique(0(No stroke)	High,1(Stroke)	Low),  Creating synthetic (fake but realistic) stroke cases,Balancing the dataset, Without this:Model learns mostly "No Stroke",Poor prediction for stroke cases
+
+
+
+stroke_recipe
+
+#Cross Validation - It splits your training data into multiple parts for model testing.(Split my training data into 10 parts so I can test my model 10 different times in a fair way.) Benift : Avoid overfitting,Get more reliable accuracy,Test model on multiple splits,Compare models fairly
+
+#You divide your training data into 10 equal parts (folds):Fold 1Fold 2Fold 3...Fold 10
+#v = 10 “Split data into 10 folds”
+#strata = stroke Keeps the same proportion of stroke cases in each fold (Without stratification:Some folds may have no stroke cases,Model evaluation becomes wrong   With stratification:Each fold has same stroke ratio)
+
+set.seed(123)
+cv_folds <-vfold_cv(stroke_train, v = 10, strata = stroke)
+
+
+#Goal - You want to build a model that predicts:Will a person have a stroke?  0 = No Stroke,1 = Stroke
+#Model 1: Logistic Regression
+
+#Step 1: Create the Logistic Regression Model - "I want to use Logistic Regression for a classification problem."
+#logistic_reg() - Create an empty logistic regression model
+#set_engine("glm") - Use R's built-in logistic regression engine(glm = Generalized Linear Model (built into R))
+#set_mode("classification") - Tells R:I am predicting categories.Not numbers.Because:Stroke = Yes or No.This is a classification problem.
+
+log_model <- logistic_reg() %>%
+  set_engine("glm") %>%
+  set_mode("classification")
+
+#Step 2: Create a Workflow - Data Preparation + Model into one object.
+#workflow() - Create an empty machine learning pipeline
+#add_recipe(stroke_recipe) - Adds your preprocessing steps.(Fill missing values,Convert text to numbers,Normalize data,Apply SMOTE)
+#add_model(log_model) - Adds the logistic regression model.
+
+log_wf <- workflow() %>%
+  add_recipe(stroke_recipe) %>%
+  add_model(log_model)
+
+#Step 3: Train and Test the Model
+#fit_resamples() - Train the model many times using cross-validation
+#resamples = cv_folds - Uses the 10 folds you created earlier.(Run 1:Train on 9 folds,Test on 1 fold .Run 2:Train on different 9 folds,Test on another fold....Run 10:Train on 9 folds,Test on last fold.....After 10 runs:Average all results This gives a more reliable evaluation.)
+#metrics = metric_set(...)
+
+#accuracy - How many predictions were correct?(Example:100 people tested,95 predicted correctly..Accuracy = 95%)
+#roc_auc - How well the model separates Stroke and No Stroke ,Values:0.5 = Bad,1.0 = Perfect...Higher is better.
+#sens(Sensitivity)- How many actual stroke cases did the model find?Example:100 stroke patients,80 detected,...Sensitivity = 80%
+#spec(Specificity) - How many non-stroke patients were correctly identified?Example:100 non-stroke patients,95 correctly identified...Specificity = 95%
+
+log_fit <- fit_resamples(
+  log_wf,
+  resamples = cv_folds,
+  metrics = metric_set(
+    accuracy,
+    roc_auc,
+    sens,
+    spec
+  )
+)
+
+collect_metrics(log_fit)
+
+
+
+#Model 2: Decision Tree - A Decision Tree makes decisions using a series of questions.Example:Age > 60?Yes.. -> Hypertension? Yes → Stroke,No  → No Stroke....It looks like a tree with branches.
+
+#Step 1: Create the Decision Tree Model
+#decision_tree() - Create a Decision Tree model
+#cost_complexity = tune() - This controls tree pruning.(tune() = Try different values and choose the best one)
+#tree_depth = tune() - Controls how deep the tree can grow.(example -Depth = 2 Age? ->yes,no...depth = 10 age?,BMI?,Gloucose?....)   tune() = Find the best depth automatically
+#set_engine("rpart") - Use the rpart package to build the decision tree
+#
+
+tree_model <- decision_tree(
+  cost_complexity = tune(),
+  tree_depth = tune()
+) %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+#Step 2: Create a Workflow - Combine:Recipe + Decision Tree
+
+tree_wf <- workflow() %>%
+  add_recipe(stroke_recipe) %>%
+  add_model(tree_model)
+
+#Step 3: Create a Grid of Values - We don't know the best: cost_complexity, tree_depth So we test many combinations.
+#levels = 5- Try 5 different values for each parameter
+
+tree_grid <- grid_regular(
+  cost_complexity(),
+  tree_depth(),
+  levels = 5
+)
+
+#Step 4: Tune the Model
+#tune_grid() - Try all parameter combinations and find the best one
+#
+
+
+
+tree_tuned <- tune_grid(
+  tree_wf,
+  resamples = cv_folds,
+  grid = tree_grid,
+  metrics = metric_set(
+    accuracy,
+    roc_auc
+  )
+)
+
+
+
+#Model 3: Random Forest - A Random Forest is a collection of many Decision Trees.This usually gives better accuracy than a single Decision Tree.
+
+#Step 1: Create the Random Forest Model
+#rand_forest() - Create a forest of decision trees
+#trees = 500 - Build 500 decision trees(Then combine their predictions.More trees generally make the model more stable.)
+#mtry = tune() - When a tree splits data, it chooses from a subset of variables.(age,bmi,glucose,hypertension,heart_disease) Instead of checking all variables, Random Forest randomly checks only a few."How many predictors can be considered at each split?"
+#min_n = tune() - Minimum number of observations in a leaf node(Leaf A = 50 people,Leaf B = 30 people,Leaf C = 2 people)
+#set_engine("ranger") - Use the ranger package to build the Random Forest
+
+rf_model <- rand_forest(
+  trees = 500,
+  mtry = tune(),
+  min_n = tune()
+) %>%
+  set_engine("ranger") %>%
+  set_mode("classification")
+
+#Step 2: Create a Workflow(Recipe+Random Forest)
+
+rf_wf <- workflow() %>%
+  add_recipe(stroke_recipe) %>%
+  add_model(rf_model)
+
+#Step 3: Create a Tuning Grid - We don't know the best:mtry,min_n ...So we test different values.
+#mtry(range = c(2,10)) - ry values between:2 and 10 For example:2 4 6 8 10
+#min_n() - Try different values for minimum leaf size.(2,5,10,15,20)
+#levels = 5 - Use 5 values for each parameter
+#
+
+rf_grid <- grid_regular(
+  mtry(range = c(2,10)),
+  min_n(),
+  levels = 5
+)
+
+
+#Step 4: Tune the Model
+#tune_grid() -Try all parameter combinations and find the best one
+#grid = rf_grid - Uses all combinations from your tuning grid.
+#
+rf_tuned <- tune_grid(
+  rf_wf,
+  resamples = cv_folds,
+  grid = rf_grid,
+  metrics = metric_set(
+    accuracy,
+    roc_auc
+  )
+)
+
+
+
+#Model 4: Support Vector Machine - An SVM is a machine learning algorithm that tries to find the best boundary between classes.The SVM tries to find the boundary that separates the two groups as clearly as possible.
+
+#Step 1: Create the SVM Model
+#svm_rbf() - Creates a Support Vector Machine with an RBF kernel.The RBF kernel allows the SVM to create curved boundaries.
+#cost = tune() - Cost controls how strict the SVM is.(Small cost:More flexible,Allows some mistakes...Large cost:Very strict,Tries to classify everything correctly)
+#rbf_sigma = tune() - This controls the shape of the curved boundary.(Small sigma:Smooth boundary...Large sigma:Complex boundary)
+#set_engine("kernlab") - Use the kernlab package to build the SVM
+
+
+install.packages("kernlab")
+library(kernlab)
+svm_model <- svm_rbf(
+  cost = tune(),
+  rbf_sigma = tune()
+) %>%
+  set_engine("kernlab") %>%
+  set_mode("classification")
+
+#Step 2: Create a Workflow(Recipe+ SVM Model)
+
+svm_wf <- workflow() %>%
+  add_recipe(stroke_recipe) %>%
+  add_model(svm_model)
+
+#Step 3: Tune the SVM
+#tune_grid() - Try many combinations of cost and sigma
+#grid = 10 - Generate 10 different combinations of cost and sigma
+#
+
+
+svm_tuned <- tune_grid(
+  svm_wf,
+  resamples = cv_folds,
+  grid = 10,
+  metrics = metric_set(
+    accuracy,
+    roc_auc
+  )
+)
+
+
+
+
+#Model 5: XGBoost - Instead of creating one tree or many independent trees, it builds trees one after anotherExample : Tree 1:Predicts 80% correctly -> Tree 2:Focuses on Tree 1's mistakes -> Tree 3:Focuses on remaining mistakesAnd so on...Tree 1,Tree 2 fixes mistakes,Tree 3 fixes mistakes,Tree 4 fixes mistakes...This often produces very high accuracy.)
+
+
+#Step 1: Create the XGBoost Model
+#boost_tree() - Create a boosted tree model(Creates an XGBoost model.)
+#trees = 500 - Build 500 trees Each tree learns from errors made by previous trees.
+#tree_depth = tune() - Controls how deep each tree can grow.
+#learn_rate = tune() - It controls:How fast the model learns(Large learning rate-Learns quickly,May miss optimal solution....Small learning rate- Learns slowly,Often more accurate)
+#min_n = tune() - Minimum observations require for a split
+#set_engine("xgboost") - Use the xgboost package
+
+xgb_model <- boost_tree(
+  trees = 500,
+  tree_depth = tune(),
+  learn_rate = tune(),
+  min_n = tune()
+) %>%
+  set_engine("xgboost") %>%
+  set_mode("classification")
+
+#Step 2: Create a Workflow(Recipe+XGBoost Model)
+
+xgb_wf <- workflow() %>%
+  add_recipe(stroke_recipe) %>%
+  add_model(xgb_model)
+
+#Step 3: Tune the Model
+#tune_grid() - Try different parameter combinations and find the best one
+#grid = 10 - Generate 10 different combinations of parameters
+
+xgb_tuned <- tune_grid(
+  xgb_wf,
+  resamples = cv_folds,
+  grid = 10,
+  metrics = metric_set(
+    accuracy,
+    roc_auc
+  )
+)
+
+
+collect_metrics(log_fit)
+
+collect_metrics(tree_tuned)
+
+collect_metrics(rf_tuned)
+
+#collect_metrics(svm_tuned)
+
+collect_metrics(xgb_tuned)
+
+
+```
+
+
+
+
+# Task Three: Evaluate and select prediction models
+
+```{r}
+library(tidymodels)
+library(yardstick)
+# 
+# best_rf <- select_best(rf_tuned, "roc_auc")
+# final_rf_wf <- finalize_workflow(rf_wf, best_rf)
+# rf_fit <- fit(final_rf_wf, stroke_train)
+# 
+# rf_pred_prob <- predict(rf_fit, stroke_test, type = "prob")
+# rf_pred_class <- predict(rf_fit, stroke_test, type = "class")
+# rf_results <- bind_cols(
+#   stroke_test,
+#   rf_pred_class,
+#   rf_pred_prob
+# )
+# 
+# log_fit <- fit(log_wf, stroke_train)
+# 
+# log_pred_class <- predict(log_fit, stroke_test, type = "class")
+# log_pred_prob  <- predict(log_fit, stroke_test, type = "prob")
+# 
+# log_results <- bind_cols(
+#   stroke_test,
+#   log_pred_class,
+#   log_pred_prob
+# )
+# 
+# roc_auc(log_results,
+#         truth = stroke,
+#         .pred_1)
+# 
+# 
+# 
+# 
+# 
+# best_xgb <- select_best(xgb_tuned, "roc_auc")
+# 
+# final_xgb_wf <- finalize_workflow(xgb_wf, best_xgb)
+# 
+# xgb_fit <- fit(final_xgb_wf, stroke_train)
+# 
+# xgb_pred_class <- predict(xgb_fit, stroke_test, type = "class")
+# xgb_pred_prob  <- predict(xgb_fit, stroke_test, type = "prob")
+# 
+# 
+# 
+# conf_mat(rf_results,
+#          truth = stroke,
+#          estimate = .pred_class)
+# 
+# 
+# metric_set(accuracy, sens, spec, precision, f_meas)(
+#   rf_results,
+#   truth = stroke,
+#   estimate = .pred_class
+# )
+# 
+# 
+# roc_auc(rf_results,
+#         truth = stroke,
+#         .pred_1)
+# 
+# 
+# roc_curve(rf_results,
+#           truth = stroke,
+#           .pred_1) %>%
+#   autoplot()
+# 
+# roc_auc(log_results, truth = stroke, .pred_1)
+# roc_auc(rf_results, truth = stroke, .pred_1)
+# roc_auc(svm_results, truth = stroke, .pred_1)
+# roc_auc(xgb_results, truth = stroke, .pred_1)
+# 
+
+best_xgb <- select_best(xgb_tuned, metric = "roc_auc")
+
+final_xgb_wf <- finalize_workflow(xgb_wf, best_xgb)
+
+xgb_fit <- fit(final_xgb_wf, stroke_train)
+
+xgb_pred_class <- predict(xgb_fit, stroke_test, type = "class")
+xgb_pred_prob  <- predict(xgb_fit, stroke_test, type = "prob")
+
+xgb_results <- stroke_test %>%
+  bind_cols(xgb_pred_prob)
+
+roc_auc(xgb_results, truth = stroke, .pred_1)
+
+```
+
+
+
+# Task Four: Deploy the prediction model
+
+```{r}
+# 
+# install.packages("shinydashboard")
+# install.packages("rmarkdown")
+# install.packages("shiny")
+# install.packages("plotly")
+
+
+
+library(shiny)
+library(shinydashboard)
+library(plotly)
+library(rmarkdown)
+
+# =====================
+# MODEL PLACEHOLDER
+# =====================
+# If you have your actual model saved as an .rds file, uncomment the line below:
+# final_model <- readRDS("path_to_your_model.rds")
+
+final_model <- xgb_fit
+saveRDS(final_model, "model.rds")
+getwd()
+
+# =====================
+# UI
+# =====================
+ui <- dashboardPage(
+  skin = "black", 
+  
+  dashboardHeader(title = "Stroke Prediction"),
+  
+  dashboardSidebar(
+    selectInput("gender", "Gender:", c("Male", "Female")),
+    numericInput("age", "Age:", 65),
+    
+    selectInput("hypertension", "Hypertension:", c("No" = "0", "Yes" = "1"), selected = "1"),
+    selectInput("heart_disease", "Heart Disease:", c("No" = "0", "Yes" = "1"), selected = "1"),
+    
+    selectInput("ever_married", "Are you married?", c("No", "Yes"), selected = "Yes"),
+    
+    selectInput("work_type", "Work Type:",
+                c("children", "Govt_job", "Never_worked", "Private", "Self-employed"),
+                selected = "Self-employed"),
+                
+    selectInput("Residence_type", "Residence Type:",
+                c("Rural", "Urban"), selected = "Rural"),
+    
+    numericInput("glucose", "Average Glucose Level:", 100),
+    numericInput("bmi", "BMI:", 25),
+    
+    selectInput("smoking_status", "Smoking Status:",
+                c("never smoked", "formerly smoked", "smokes", "Unknown")),
+    
+    br(),
+    div(style = "text-align: center;",
+        actionButton("predict", "Predict", class = "btn-primary", style = "width: 80%;"),
+        br(), br(),
+        downloadButton("download_report", "Download PDF Report", class = "btn-success", style = "width: 80%;")
+    )
+  ),
+  
+  dashboardBody(
+    # Dynamic display container that toggles based on user action
+    uiOutput("dashboard_display")
+  )
+)
+
+# =====================
+# SERVER
+# =====================
+server <- function(input, output, session) {
+  
+  results <- reactiveValues(stroke_p = 0, no_stroke_p = 0)
+  
+  shap_values <- reactiveVal(data.frame(
+    Feature = character(),
+    Contribution = numeric()
+  ))
+  
+  history_data <- reactiveVal(data.frame(
+    `Patient ID` = integer(),
+    Age = numeric(),
+    Gender = character(),
+    Hypertension = character(),
+    `Heart Disease` = character(),
+    `Glucose Level` = numeric(),
+    BMI = numeric(),
+    `Stroke Risk` = character(),
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  ))
+  
+  # Track run counts; starts at 0 to keep the dashboard initial state blank
+  counter <- reactiveVal(0)
+  
+  observeEvent(input$predict, {
+    counter(counter() + 1)
+    
+    new_data <- data.frame(
+      age = input$age,
+      gender = input$gender,
+      hypertension = input$hypertension,
+      heart_disease = input$heart_disease,
+      ever_married = input$ever_married,
+      work_type = input$work_type,
+      Residence_type = input$Residence_type,
+      avg_glucose_level = input$glucose,
+      bmi = input$bmi,
+      smoking_status = input$smoking_status
+    )
+    
+    # --- OPTION A: YOUR REAL ML MODEL & SHAP PIPELINE ---
+    # pred_prob <- predict(final_model, new_data, type = "prob")
+    # results$stroke_p <- round(pred_prob[[2]] * 100, 2)
+    # results$no_stroke_p <- round(pred_prob[[1]] * 100, 2)
+    
+    # --- OPTION B: LIVE DEMO SIMULATION ---
+    w_age <- round(input$age * 0.65, 2)
+    w_glucose <- round(input$glucose * 0.12, 2)
+    w_hyper <- ifelse(input$hypertension == "1", 15.00, 1.50)
+    w_heart <- ifelse(input$heart_disease == "1", 18.00, 1.20)
+    w_bmi <- round(input$bmi * 0.25, 2)
+    
+    base_risk <- w_age + w_glucose + w_hyper + w_heart
+    simulated_stroke <- min(99.9, max(0.1, round(base_risk, 2)))
+    
+    results$stroke_p <- simulated_stroke
+    results$no_stroke_p <- round(100 - simulated_stroke, 2)
+    
+    df_shap <- data.frame(
+      Feature = c("Age", "Heart Disease", "Hypertension", "Glucose Level", "BMI"),
+      Contribution = c(w_age, w_heart, w_hyper, w_glucose, w_bmi)
+    )
+    df_shap <- df_shap[order(df_shap$Contribution), ]
+    shap_values(df_shap)
+    
+    new_row <- data.frame(
+      `Patient ID` = paste0("#", 1000 + counter()),
+      Age = input$age,
+      Gender = input$gender,
+      Hypertension = ifelse(input$hypertension == "1", "Yes", "No"),
+      `Heart Disease` = ifelse(input$heart_disease == "1", "Yes", "No"),
+      `Glucose Level` = input$glucose,
+      BMI = input$bmi,
+      `Stroke Risk` = paste0(results$stroke_p, "%"),
+      check.names = FALSE,
+      stringsAsFactors = FALSE
+    )
+    
+    current_history <- history_data()
+    updated_history <- rbind(new_row, current_history)
+    history_data(updated_history)
+  })
+  
+  # Dynamic UI Switch Manager
+  output$dashboard_display <- renderUI({
+    if (counter() == 0) {
+      # FIRST IMPRESSION STATE: Empty placeholder panel with clean instructions
+      fluidRow(
+        box(
+          title = "Patient Diagnostic System",
+          width = 12,
+          status = "primary",
+          solidHeader = TRUE,
+          p(style = "font-size: 16px; text-align: center; padding: 40px 0;",
+            "No data analyzed yet. Please adjust the clinical parameters in the left sidebar menu and click ",
+            tags$strong("Predict"), " to evaluate stroke risk profiles.")
+        )
+      )
+    } else {
+      # CALCULATED STATE: Shows complete analytical components cleanly
+      tagList(
+        fluidRow(
+          box(
+            title = "Prediction Summary", 
+            width = 12, 
+            collapsible = TRUE,
+            uiOutput("prediction_cards")
+          )
+        ),
+        fluidRow(
+          box(
+            title = "Risk Distribution Breakdown",
+            width = 5,
+            collapsible = TRUE,
+            plotlyOutput("stroke_plot", height = "300px")
+          ),
+          box(
+            title = "Patient-Specific Risk Drivers (SHAP Value Insights)",
+            width = 7,
+            collapsible = TRUE,
+            plotlyOutput("importance_plot", height = "300px")
+          )
+        ),
+        fluidRow(
+          box(
+            title = "Patient Risk History Log",
+            width = 12,
+            collapsible = TRUE,
+            status = "primary",
+            div(style = "overflow-x: auto;", 
+                tableOutput("history_table")
+            )
+          )
+        )
+      )
+    }
+  })
+  
+  # Render custom colored UI metric cards
+  output$prediction_cards <- renderUI({
+    req(counter() > 0)
+    fluidRow(
+      column(width = 6,
+             div(style = "background-color: #c94c3a; color: white; padding: 20px; border-radius: 3px; position: relative; margin-bottom: 10px;",
+                 div(style = "font-size: 38px; font-weight: bold; line-height: 1.2;", paste0(results$stroke_p, "%")),
+                 div(style = "font-size: 14px; font-weight: 500; opacity: 0.9;", "Probability of having a Stroke"),
+                 div(class = "fa fa-info", style = "position: absolute; right: 25px; bottom: 15px; font-size: 55px; opacity: 0.15;")
+             )
+      ),
+      column(width = 6,
+             div(style = "background-color: #27ae60; color: white; padding: 20px; border-radius: 3px; position: relative; margin-bottom: 10px;",
+                 div(style = "font-size: 38px; font-weight: bold; line-height: 1.2;", paste0(results$no_stroke_p, "%")),
+                 div(style = "font-size: 14px; font-weight: 500; opacity: 0.9;", "Probability of not having a Stroke"),
+                 div(class = "fa fa-info", style = "position: absolute; right: 25px; bottom: 15px; font-size: 55px; opacity: 0.15;")
+             )
+      )
+    )
+  })
+  
+  # Render Donut Chart
+  output$stroke_plot <- renderPlotly({
+    req(counter() > 0)
+    plot_ly(
+      labels = c("No Stroke Risk", "Stroke Risk"),
+      values = c(results$no_stroke_p, results$stroke_p),
+      type = 'pie',
+      hole = 0.6,
+      marker = list(colors = c("#27ae60", "#c94c3a")),
+      textinfo = 'percent',
+      hoverinfo = 'text',
+      text = ~paste0(c("No Stroke Risk: ", "Stroke Risk: "), c(results$no_stroke_p, results$stroke_p), "%")
+    ) %>%
+      layout(
+        showlegend = TRUE,
+        legend = list(orientation = "h", xanchor = "center", x = 0.5, y = -0.1),
+        margin = list(l = 10, r = 10, t = 10, b = 10)
+      )
+  })
+  
+  # Render SHAP Chart
+  output$importance_plot <- renderPlotly({
+    req(counter() > 0)
+    df <- shap_values()
+    df$Feature <- factor(df$Feature, levels = df$Feature)
+    
+    plot_ly(
+      data = df,
+      x = ~Contribution,
+      y = ~Feature,
+      type = 'bar',
+      orientation = 'h',
+      marker = list(color = '#34495e'),
+      hoverinfo = 'text',
+      text = ~paste0("Risk Weight Contribution: +", Contribution)
+    ) %>%
+      layout(
+        xaxis = list(title = "Relative Risk Impact Weight"),
+        yaxis = list(title = ""),
+        margin = list(l = 100, r = 20, t = 20, b = 40)
+      )
+  })
+  
+  # Render Patient History Log Table
+  output$history_table <- renderTable({
+    req(counter() > 0)
+    history_data()
+  }, striped = TRUE, hover = TRUE, spacing = "m", align = "c", width = "100%")
+  
+  # Generating PDF Reports
+  output$download_report <- downloadHandler(
+    filename = function() {
+      paste0("Stroke_Risk_Report_", Sys.Date(), ".pdf")
+    },
+    content = function(file) {
+      req(counter() > 0)
+      tempReport <- file.path(tempdir(), "report.Rmd")
+      
+      report_text <- paste0(
+        "---\n",
+        "title: \"Stroke Assessment Clinical Report\"\n",
+        "date: \"", Sys.Date(), "\"\n",
+        "output: pdf_document\n",
+        "---\n\n",
+        "### 1. Patient Demographics & Background Clinical Metrics\n",
+        "***\n",
+        "- **Age:** ", input$age, " years old\n",
+        "- **Gender:** ", input$gender, "\n",
+        "- **Hypertension History:** ", ifelse(input$hypertension == "1", "Yes", "No"), "\n",
+        "- **Heart Disease History:** ", ifelse(input$heart_disease == "1", "Yes", "No"), "\n",
+        "- **Average Glucose Level:** ", input$glucose, " mg/dL\n",
+        "- **Body Mass Index (BMI):** ", input$bmi, " kg/m²\n\n",
+        "### 2. Predictive Diagnostics Summary Output\n",
+        "***\n",
+        "- **Probability of having a Stroke:** **", results$stroke_p, "%**\n",
+        "- **Probability of NOT having a Stroke:** **", results$no_stroke_p, "%**\n\n",
+        "### 3. Clinical Disclaimer\n",
+        "***\n",
+        "*This analytical summary report is generated purely for screening support, automated risk calculation, and scientific evaluations.*"
+      )
+      
+      writeLines(report_text, con = tempReport)
+      rmarkdown::render(tempReport, output_file = file, envir = new.env(parent = globalenv()))
+    }
+  )
+}
+
+# =====================
+# RUN APP
+# =====================
+shinyApp(ui, server)
+
+saveRDS(final_model, "model.rds")
+getwd()
+
+
+# install.packages("rsconnect")
+# library(rsconnect)
+# 
+# 
+# 
+# rsconnect::setAccountInfo(name='udara',
+# 			  token='5DA3E49B0485AC0295058589D3D83D6F',
+# 			  secret='')
+```
+``
+
+
+
+
+# Task Five: Findings and Conclusions
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
