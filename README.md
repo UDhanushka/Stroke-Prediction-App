@@ -59,6 +59,19 @@ The system also provides **data visualization, feature importance insights, pati
 
 ---
 
+## 📸 Application Screenshots
+
+### 🏠 Dashboard Overview
+![Dashboard](www/dashboard.png)
+
+### 📊 Prediction Output
+![Prediction](www/prediction.png)
+
+### 📈 Risk Analysis
+![Risk Analysis](www/risk_analysis_report.png)
+
+---
+
 ## 🛠️ Tech Stack
 
 | Technology | Purpose |
@@ -71,18 +84,6 @@ The system also provides **data visualization, feature importance insights, pati
 | caret / ML model | Prediction engine |
 
 ---
-## 📸 Application Screenshots
-
-### 🏠 Dashboard Overview
-![Dashboard](www/dashboard.png)
-
-### 📊 Prediction Output
-![Prediction](www/prediction.png)
-
-### 📈 Risk Analysis
-![Risk Analysis](www/risk_analysis_report.png)
-
-
 ## 📂 Project Structure
 
 ```bash
