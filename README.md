@@ -71,6 +71,17 @@ The system also provides **data visualization, feature importance insights, pati
 | caret / ML model | Prediction engine |
 
 ---
+## 📸 Application Screenshots
+
+### 🏠 Dashboard Overview
+![Dashboard](www/dashboard.png)
+
+### 📊 Prediction Output
+![Prediction](www/prediction.png)
+
+### 📈 Risk Analysis
+![Risk Analysis](www/risk_analysis_report.png)
+
 
 ## 📂 Project Structure
 
@@ -80,6 +91,6 @@ stroke-prediction-app/
 ├── app.R                      # Main Shiny application
 ├── model.rds                  # Trained ML model
 ├── healthcare-dataset.csv    # Dataset (optional)
-├── report.Rmd                # PDF report template
+├── Build-deploy-stroke-prediction-model-R.Rmd                # PDF report template
 │
 └── www/                      # Static assets (images, CSS)
